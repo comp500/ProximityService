@@ -20,7 +20,7 @@ func main() {
 	port := flag.Int("port", 8080, "Port to run the server on")
 	flag.Parse()
 
-	box := packr.NewBox("./web")
+	box := packr.NewBox("./web/dist")
 
 	http.Handle("/", http.FileServer(box))
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

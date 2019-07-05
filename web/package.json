@@ -1,0 +1,29 @@
+{
+  "name": "proximity-service",
+  "version": "1.0.0",
+  "description": "A service running on my Raspberry Pi to read various proximity sensors and alert the user.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "parcel src/index.html",
+    "build": "parcel build src/index.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/comp500/ProximityService.git"
+  },
+  "author": "comp500",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/comp500/ProximityService/issues"
+  },
+  "homepage": "https://github.com/comp500/ProximityService#readme",
+  "devDependencies": {
+    "parcel-bundler": "^1.12.3",
+    "sass": "^1.22.3",
+    "typescript": "^3.5.2"
+  },
+  "dependencies": {
+    "bulma": "^0.7.5"
+  }
+}
