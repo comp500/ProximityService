@@ -4,8 +4,8 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"log"
+	"strings"
 
 	"github.com/paypal/gatt"
 )
@@ -65,21 +65,29 @@ func onPeriphConnected(p gatt.Peripheral, err error) {
 		fmt.Printf("Failed to set MTU, err: %s\n", err)
 	}
 
-	// Discovery services
+	// Nordic UART service
+	srvUUID := gatt.MustParseUUID("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
+	txdUUID := gatt.MustParseUUID("6E400002-B5A3-F393-E0A9-E50E24DCCA9E")
+	rxdUUID := gatt.MustParseUUID("6E400003-B5A3-F393-E0A9-E50E24DCCA9E")
+	txdFound := false
+	rxdFound := false
+
+	// Discover services
 	ss, err := p.DiscoverServices(nil)
 	if err != nil {
 		fmt.Printf("Failed to discover services, err: %s\n", err)
+		p.Device().CancelConnection(p)
 		return
 	}
 
 	for _, s := range ss {
-		msg := "Service: " + s.UUID().String()
-		if len(s.Name()) > 0 {
-			msg += " (" + s.Name() + ")"
+		if !s.UUID().Equal(srvUUID) {
+			continue
 		}
-		fmt.Println(msg)
 
-		// Discovery characteristics
+		fmt.Println("UART service found")
+
+		// Discover characteristics
 		cs, err := p.DiscoverCharacteristics(nil, s)
 		if err != nil {
 			fmt.Printf("Failed to discover characteristics, err: %s\n", err)
@@ -87,48 +95,17 @@ func onPeriphConnected(p gatt.Peripheral, err error) {
 		}
 
 		for _, c := range cs {
-			msg := "  Characteristic  " + c.UUID().String()
-			if len(c.Name()) > 0 {
-				msg += " (" + c.Name() + ")"
-			}
-			msg += "\n    properties    " + c.Properties().String()
-			fmt.Println(msg)
+			if c.UUID().Equal(txdUUID) {
+				txdFound = true
+				fmt.Println("TXD characteristic found")
 
-			// Read the characteristic, if possible.
-			if (c.Properties() & gatt.CharRead) != 0 {
-				b, err := p.ReadCharacteristic(c)
-				if err != nil {
-					fmt.Printf("Failed to read characteristic, err: %s\n", err)
-					continue
-				}
-				fmt.Printf("    value         %x | %q\n", b, b)
-			}
+			} else if c.UUID().Equal(rxdUUID) {
+				rxdFound = true
+				fmt.Println("RXD characteristic found, subscribing...")
 
-			// Discovery descriptors
-			ds, err := p.DiscoverDescriptors(nil, c)
-			if err != nil {
-				fmt.Printf("Failed to discover descriptors, err: %s\n", err)
-				continue
-			}
+				// For some reason, DiscoverDescriptors must be called before subscribing
+				_, _ = p.DiscoverDescriptors(nil, c)
 
-			for _, d := range ds {
-				msg := "  Descriptor      " + d.UUID().String()
-				if len(d.Name()) > 0 {
-					msg += " (" + d.Name() + ")"
-				}
-				fmt.Println(msg)
-
-				// Read descriptor (could fail, if it's not readable)
-				b, err := p.ReadDescriptor(d)
-				if err != nil {
-					fmt.Printf("Failed to read descriptor, err: %s\n", err)
-					continue
-				}
-				fmt.Printf("    value         %x | %q\n", b, b)
-			}
-
-			// Subscribe the characteristic, if possible.
-			if (c.Properties() & (gatt.CharNotify | gatt.CharIndicate)) != 0 {
 				f := func(c *gatt.Characteristic, b []byte, err error) {
 					fmt.Printf("notified: % X | %q\n", b, b)
 				}
@@ -136,14 +113,19 @@ func onPeriphConnected(p gatt.Peripheral, err error) {
 					fmt.Printf("Failed to subscribe characteristic, err: %s\n", err)
 					continue
 				}
+			} else {
+				continue
 			}
-
 		}
-		fmt.Println()
+	}
+
+	if !txdFound || !rxdFound {
+		fmt.Println("Service not found, disconnecting...")
+		p.Device().CancelConnection(p)
 	}
 }
 
 func onPeriphDisconnected(p gatt.Peripheral, err error) {
-	fmt.Println("Disconnected")
+	fmt.Println("Disconnected, scanning...")
 	p.Device().Scan([]gatt.UUID{}, false)
 }
