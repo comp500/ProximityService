@@ -32,6 +32,8 @@ func main() {
 		_ = conn
 	})
 
+	go startBluetooth()
+
 	fmt.Printf("Starting server on port %d\n", *port)
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*port), nil))
 }
