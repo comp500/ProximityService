@@ -94,7 +94,7 @@ void error(const __FlashStringHelper*err) {
 /**************************************************************************/
 void setup(void)
 {
-  while (!Serial);  // required for Flora & Micro
+  //while (!Serial);  // required for Flora & Micro
   delay(500);
 
   Serial.begin(115200);
@@ -164,16 +164,24 @@ void setup(void)
 /**************************************************************************/
 void loop(void)
 {
-  Serial.print("0,");
-  Serial.print(analogRead(6));
-  Serial.print(",");
-  Serial.print(analogRead(A5));
-  Serial.println(",1200");
+  uint16_t analogData = analogRead(A5);
+  uint8_t part1 = analogData >> 8;
+  uint8_t part2 = analogData & 0xff;
+  // MSB of part1 is the digital value
+  if (digitalRead(6) == HIGH) {
+    part1 |= 0x80;
+  }
+
+  ble.write(0xff);
+  ble.write(part1);
+  ble.write(part2);
+  uint8_t test = 0x00;
+  ble.write(test);
   delay(10);
-  ble.print("0,");
-  ble.print(analogRead(6));
-  ble.print(",");
-  ble.print(analogRead(A5));
-  ble.println(",1200");
-  delay(10);
+
+//  Serial.print("0,");
+//  Serial.print(digitalRead(6) * 1023);
+//  Serial.print(",");
+//  Serial.print(analogRead(A5));
+//  Serial.println(",1200");
 }
