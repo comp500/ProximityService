@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/websocket"
@@ -21,6 +22,7 @@ func main() {
 	flag.Parse()
 
 	box := packr.NewBox("./web/dist")
+	list := clientList{}
 
 	http.Handle("/", http.FileServer(box))
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -29,13 +31,26 @@ func main() {
 			log.Println(err)
 			return
 		}
-		_ = conn
+
+		messageChannel := make(chan clientMessage)
+		list.Unlock()
+		list.clients = append(list.clients, messageChannel)
+		list.Lock()
+
+		for {
+			msg := <-messageChannel
+			err = conn.WriteJSON(msg)
+			if err != nil {
+				close(messageChannel)
+				return
+			}
+		}
 	})
 
 	dataChannel := make(chan []byte)
 	done := make(chan bool)
 
-	go handleData(dataChannel, done)
+	go handleData(dataChannel, done, &list)
 	go startBluetooth(dataChannel, done)
 
 	fmt.Printf("Starting server on port %d\n", *port)
@@ -44,9 +59,10 @@ func main() {
 	done <- true
 }
 
-func handleData(dataChannel chan []byte, done chan bool) {
+func handleData(dataChannel chan []byte, done chan bool, list *clientList) {
 	rcvPart1 := false
 	var part1Analog int
+	binaryValue := false
 	for {
 		select {
 		case <-done:
@@ -54,12 +70,7 @@ func handleData(dataChannel chan []byte, done chan bool) {
 		case data := <-dataChannel:
 			for _, b := range data {
 				if (b & 0x80) == 0x80 {
-					binaryValue := (b & 0x40) == 0x40
-					if binaryValue {
-						fmt.Println("Read binary: HIGH")
-					} else {
-						fmt.Println("Read binary: LOW")
-					}
+					binaryValue = (b & 0x40) == 0x40
 
 					rcvPart1 = true
 					part1Analog = int(b&0x07) << 7
@@ -67,10 +78,26 @@ func handleData(dataChannel chan []byte, done chan bool) {
 					if rcvPart1 {
 						rcvPart1 = false
 						analogValue := int(b) | part1Analog
-						fmt.Printf("Read analog: %d\n", analogValue)
+
+						msg := clientMessage{binaryValue, analogValue}
+						list.Lock()
+						for _, c := range list.clients {
+							c <- msg
+						}
+						list.Unlock()
 					}
 				}
 			}
 		}
 	}
+}
+
+type clientMessage struct {
+	bin    bool
+	analog int
+}
+
+type clientList struct {
+	clients []chan clientMessage
+	sync.Mutex
 }
