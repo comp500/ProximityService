@@ -52,7 +52,6 @@ func handleData(dataChannel chan []byte, done chan bool) {
 		case <-done:
 			return
 		case data := <-dataChannel:
-			fmt.Printf("%X\n", data)
 			for _, b := range data {
 				if (b & 0x80) == 0x80 {
 					binaryValue := (b & 0x40) == 0x40
@@ -68,7 +67,7 @@ func handleData(dataChannel chan []byte, done chan bool) {
 					if rcvPart1 {
 						rcvPart1 = false
 						analogValue := int(b) | part1Analog
-						fmt.Println("Read analog: %d", analogValue)
+						fmt.Printf("Read analog: %d\n", analogValue)
 					}
 				}
 			}
