@@ -32,8 +32,25 @@ func main() {
 		_ = conn
 	})
 
-	go startBluetooth()
+	dataChannel := make(chan []byte)
+	done := make(chan bool)
+
+	go handleData(dataChannel, done)
+	go startBluetooth(dataChannel, done)
 
 	fmt.Printf("Starting server on port %d\n", *port)
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*port), nil))
+
+	done <- true
+}
+
+func handleData(dataChannel chan []byte, done chan bool) {
+	for {
+		select {
+		case <-done:
+			return
+		case data := <-dataChannel:
+			fmt.Printf("%X\n", data)
+		}
+	}
 }

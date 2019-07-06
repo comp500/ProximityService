@@ -2,6 +2,6 @@
 
 package main
 
-func startBluetooth() {
+func startBluetooth(dataChannel chan []byte, done chan bool) {
 	// Stub
 }

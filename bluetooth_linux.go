@@ -10,21 +10,31 @@ import (
 	"github.com/paypal/gatt"
 )
 
-func startBluetooth() {
+func startBluetooth(dataChannel chan []byte, done chan bool) {
 	d, err := gatt.NewDevice(gatt.LnxMaxConnections(1), gatt.LnxDeviceID(-1, true))
 	if err != nil {
 		log.Fatalf("Failed to open device, err: %s\n", err)
 		return
 	}
 
+	handler := gattHandler{dataChannel, done}
+
 	// Register handlers.
 	d.Handle(
 		gatt.PeripheralDiscovered(onPeriphDiscovered),
-		gatt.PeripheralConnected(onPeriphConnected),
+		gatt.PeripheralConnected(handler.onPeriphConnected),
 		gatt.PeripheralDisconnected(onPeriphDisconnected),
 	)
 
 	d.Init(onStateChanged)
+
+	<-done
+	d.StopScanning()
+}
+
+type gattHandler struct {
+	dataChannel chan []byte
+	done        chan bool
 }
 
 func onStateChanged(d gatt.Device, s gatt.State) {
@@ -58,7 +68,7 @@ func onPeriphDiscovered(p gatt.Peripheral, a *gatt.Advertisement, rssi int) {
 	p.Device().Connect(p)
 }
 
-func onPeriphConnected(p gatt.Peripheral, err error) {
+func (g gattHandler) onPeriphConnected(p gatt.Peripheral, err error) {
 	fmt.Println("Connected")
 
 	if err := p.SetMTU(500); err != nil {
@@ -107,7 +117,7 @@ func onPeriphConnected(p gatt.Peripheral, err error) {
 				_, _ = p.DiscoverDescriptors(nil, c)
 
 				f := func(c *gatt.Characteristic, b []byte, err error) {
-					fmt.Printf("notified: % X | %q\n", b, b)
+					g.dataChannel <- b
 				}
 				if err := p.SetNotifyValue(c, f); err != nil {
 					fmt.Printf("Failed to subscribe characteristic, err: %s\n", err)
@@ -123,6 +133,9 @@ func onPeriphConnected(p gatt.Peripheral, err error) {
 		fmt.Println("Service not found, disconnecting...")
 		p.Device().CancelConnection(p)
 	}
+
+	<-g.done
+	p.Device().CancelConnection(p)
 }
 
 func onPeriphDisconnected(p gatt.Peripheral, err error) {
