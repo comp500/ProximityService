@@ -95,7 +95,7 @@ void error(const __FlashStringHelper*err) {
 void setup(void)
 {
   //while (!Serial);  // required for Flora & Micro
-  delay(500);
+  //delay(500);
 
   Serial.begin(115200);
   Serial.println(F("Adafruit Bluefruit Command <-> Data Mode Example"));
@@ -164,19 +164,27 @@ void setup(void)
 /**************************************************************************/
 void loop(void)
 {
-  uint16_t analogData = analogRead(A5);
-  uint8_t part1 = analogData >> 8;
-  uint8_t part2 = analogData & 0xff;
-  // MSB of part1 is the digital value
-  if (digitalRead(6) == HIGH) {
-    part1 |= 0x80;
+  while (!ble.isConnected()) {
+      delay(500);
   }
 
-  ble.write(0xff);
+  // 10-bit value from the 32u4
+  uint16_t analogData = analogRead(A5);
+  uint8_t part1 = analogData >> 7;
+  uint8_t part2 = analogData & 0x7f;
+  // MSB of part1 is always 1
+  // next bit is the digital value
+  // MSB of part2 is always 0
+  part1 |= 0x80;
+  if (digitalRead(6) == HIGH) {
+    part1 |= 0x40;
+  }
+
+  // Digital data = D, Analog data = A
+  // 1D000AAA 0AAAAAAA
+
   ble.write(part1);
   ble.write(part2);
-  uint8_t test = 0x00;
-  ble.write(test);
   delay(10);
 
 //  Serial.print("0,");

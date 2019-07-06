@@ -45,12 +45,33 @@ func main() {
 }
 
 func handleData(dataChannel chan []byte, done chan bool) {
+	rcvPart1 := false
+	var part1Analog int
 	for {
 		select {
 		case <-done:
 			return
 		case data := <-dataChannel:
 			fmt.Printf("%X\n", data)
+			for _, b := range data {
+				if (b & 0x80) == 0x80 {
+					binaryValue := (b & 0x40) == 0x40
+					if binaryValue {
+						fmt.Println("Read binary: HIGH")
+					} else {
+						fmt.Println("Read binary: LOW")
+					}
+
+					rcvPart1 = true
+					part1Analog = int(b&0x07) << 7
+				} else {
+					if rcvPart1 {
+						rcvPart1 = false
+						analogValue := int(b) | part1Analog
+						fmt.Println("Read analog: %d", analogValue)
+					}
+				}
+			}
 		}
 	}
 }
