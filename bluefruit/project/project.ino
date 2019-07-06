@@ -152,6 +152,9 @@ void setup(void)
   ble.setMode(BLUEFRUIT_MODE_DATA);
 
   Serial.println(F("******************************"));
+
+  pinMode(6,INPUT);
+  pinMode(A5,INPUT);
 }
 
 /**************************************************************************/
@@ -161,32 +164,16 @@ void setup(void)
 /**************************************************************************/
 void loop(void)
 {
-  // Check for user input
-  char n, inputs[BUFSIZE+1];
-
-  if (Serial.available())
-  {
-    n = Serial.readBytes(inputs, BUFSIZE);
-    inputs[n] = 0;
-    // Send characters to Bluefruit
-    Serial.print("Sending: ");
-    Serial.println(inputs);
-
-    // Send input data to host via Bluefruit
-    ble.print(inputs);
-  }
-
-  // Echo received data
-  while ( ble.available() )
-  {
-    int c = ble.read();
-
-    Serial.print((char)c);
-
-    // Hex output too, helps w/debugging!
-    Serial.print(" [0x");
-    if (c <= 0xF) Serial.print(F("0"));
-    Serial.print(c, HEX);
-    Serial.print("] ");
-  }
+  Serial.print("0,");
+  Serial.print(analogRead(6));
+  Serial.print(",");
+  Serial.print(analogRead(A5));
+  Serial.println(",1200");
+  delay(10);
+  ble.print("0,");
+  ble.print(analogRead(6));
+  ble.print(",");
+  ble.print(analogRead(A5));
+  ble.println(",1200");
+  delay(10);
 }
