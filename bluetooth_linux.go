@@ -17,7 +17,7 @@ func startBluetooth(dataChannel chan []byte) {
 		return
 	}
 
-	handler := gattHandler{dataChannel, done}
+	handler := gattHandler{dataChannel}
 
 	// Register handlers.
 	d.Handle(
@@ -27,14 +27,10 @@ func startBluetooth(dataChannel chan []byte) {
 	)
 
 	d.Init(onStateChanged)
-
-	<-done
-	d.StopScanning()
 }
 
 type gattHandler struct {
 	dataChannel chan []byte
-	done        chan bool
 }
 
 func onStateChanged(d gatt.Device, s gatt.State) {
@@ -133,9 +129,6 @@ func (g gattHandler) onPeriphConnected(p gatt.Peripheral, err error) {
 		fmt.Println("Service not found, disconnecting...")
 		p.Device().CancelConnection(p)
 	}
-
-	<-g.done
-	p.Device().CancelConnection(p)
 }
 
 func onPeriphDisconnected(p gatt.Peripheral, err error) {
