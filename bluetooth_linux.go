@@ -10,7 +10,7 @@ import (
 	"github.com/paypal/gatt"
 )
 
-func startBluetooth(dataChannel chan []byte, done chan bool) {
+func startBluetooth(dataChannel chan []byte) {
 	d, err := gatt.NewDevice(gatt.LnxMaxConnections(1), gatt.LnxDeviceID(-1, true))
 	if err != nil {
 		log.Fatalf("Failed to open device, err: %s\n", err)

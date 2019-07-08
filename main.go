@@ -60,40 +60,33 @@ func main() {
 	})
 
 	dataChannel := make(chan []byte)
-	done := make(chan bool)
 
 	go manager.run()
-	go handleData(dataChannel, done, &manager)
-	go startBluetooth(dataChannel, done)
+	go handleData(dataChannel, &manager)
+	go startBluetooth(dataChannel)
 
 	fmt.Printf("Starting server on port %d\n", *port)
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*port), nil))
-
-	done <- true
 }
 
-func handleData(dataChannel chan []byte, done chan bool, manager *clientManager) {
+func handleData(dataChannel chan []byte, manager *clientManager) {
 	rcvPart1 := false
 	var part1Analog int
 	binaryValue := false
 	for {
-		select {
-		case <-done:
-			return
-		case data := <-dataChannel:
-			for _, b := range data {
-				if (b & 0x80) == 0x80 {
-					binaryValue = (b & 0x40) == 0x40
+		data := <-dataChannel
+		for _, b := range data {
+			if (b & 0x80) == 0x80 {
+				binaryValue = (b & 0x40) == 0x40
 
-					rcvPart1 = true
-					part1Analog = int(b&0x07) << 7
-				} else {
-					if rcvPart1 {
-						rcvPart1 = false
-						analogValue := int(b) | part1Analog
+				rcvPart1 = true
+				part1Analog = int(b&0x07) << 7
+			} else {
+				if rcvPart1 {
+					rcvPart1 = false
+					analogValue := int(b) | part1Analog
 
-						manager.broadcast <- clientMessage{binaryValue, analogValue}
-					}
+					manager.broadcast <- clientMessage{binaryValue, analogValue}
 				}
 			}
 		}
