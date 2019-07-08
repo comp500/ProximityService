@@ -4,12 +4,22 @@
 	<meta charset="utf-8">
 	<title>Proximity Service Web UI</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<script src="./index.ts"></script>
 	<link rel="stylesheet" href="styles.scss">
 </head>
 <body>
 	<div class="container">
 		<h1 class="title">Web UI</h1>
+		<p>
+			Digital data value: <span id="digital"></span>
+		</p>
+		<p>
+			Analog data value: <span id="analog"></span>
+		</p>
+		<p>Average message time <span id="dt"></span>ms</p>
+		<p>Average messages per second <span id="dps"></span></p>
+		<p>Total messages received <span id="total"></span></p>
 	</div>
+
+	<script src="./index.ts"></script>
 </body>
 </html>

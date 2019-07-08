@@ -8,20 +8,24 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/gobuffalo/packr"
+	"github.com/gobuffalo/packr/v2"
 	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		// Allow all origins
+		return true
+	},
 }
 
 func main() {
 	port := flag.Int("port", 8080, "Port to run the server on")
 	flag.Parse()
 
-	box := packr.NewBox("./web/dist")
+	box := packr.New("WebFiles", "./web/dist")
 	list := clientList{}
 
 	http.Handle("/", http.FileServer(box))
@@ -33,15 +37,27 @@ func main() {
 		}
 
 		messageChannel := make(chan clientMessage)
-		list.Unlock()
-		list.clients = append(list.clients, messageChannel)
 		list.Lock()
+		list.clients = append(list.clients, messageChannel)
+		list.Unlock()
 
 		for {
 			msg := <-messageChannel
 			err = conn.WriteJSON(msg)
 			if err != nil {
-				close(messageChannel)
+				list.Lock()
+				index := -1
+				for i, v := range list.clients {
+					if v == messageChannel {
+						index = i
+						break
+					}
+				}
+				if index > -1 {
+					list.clients[index] = list.clients[len(list.clients)-1]
+					list.clients = list.clients[:len(list.clients)-1]
+				}
+				list.Unlock()
 				return
 			}
 		}
@@ -93,8 +109,8 @@ func handleData(dataChannel chan []byte, done chan bool, list *clientList) {
 }
 
 type clientMessage struct {
-	bin    bool
-	analog int
+	Bin    bool
+	Analog int
 }
 
 type clientList struct {
