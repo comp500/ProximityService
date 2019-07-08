@@ -1,11 +1,18 @@
-const socket = new WebSocket(
+import ReconnectingWebSocket from "reconnecting-websocket";
+
+const socket = new ReconnectingWebSocket(
 //	(window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws"
 	"ws://192.168.1.109:9000/ws"
 );
 
+let startTime = new Date().getTime();
+let numMsgs = 0;
+
 // Connection opened
 socket.addEventListener("open", function(event) {
 	console.log("Connected");
+	startTime = new Date().getTime();
+	numMsgs = 0;
 });
 
 class eventMessage {
@@ -13,8 +20,6 @@ class eventMessage {
 	Analog: number;
 }
 
-let startTime = new Date().getTime();
-let numMsgs = 0;
 const digital = document.getElementById("digital");
 const analog = document.getElementById("analog");
 const dt = document.getElementById("dt");

@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"sync"
 
 	"github.com/gobuffalo/packr/v2"
 	"github.com/gorilla/websocket"
@@ -26,7 +25,12 @@ func main() {
 	flag.Parse()
 
 	box := packr.New("WebFiles", "./web/dist")
-	list := clientList{}
+	manager := clientManager{
+		make(map[*client]bool),
+		make(chan clientMessage),
+		make(chan *client),
+		make(chan *client),
+	}
 
 	http.Handle("/", http.FileServer(box))
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -36,28 +40,20 @@ func main() {
 			return
 		}
 
-		messageChannel := make(chan clientMessage)
-		list.Lock()
-		list.clients = append(list.clients, messageChannel)
-		list.Unlock()
+		c := client{make(chan clientMessage)}
+		manager.register <- &c
 
 		for {
-			msg := <-messageChannel
+			msg, ok := <-c.send
+			if !ok {
+				conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+
 			err = conn.WriteJSON(msg)
 			if err != nil {
-				list.Lock()
-				index := -1
-				for i, v := range list.clients {
-					if v == messageChannel {
-						index = i
-						break
-					}
-				}
-				if index > -1 {
-					list.clients[index] = list.clients[len(list.clients)-1]
-					list.clients = list.clients[:len(list.clients)-1]
-				}
-				list.Unlock()
+				manager.unregister <- &c
+				fmt.Println(err)
 				return
 			}
 		}
@@ -66,7 +62,8 @@ func main() {
 	dataChannel := make(chan []byte)
 	done := make(chan bool)
 
-	go handleData(dataChannel, done, &list)
+	go manager.run()
+	go handleData(dataChannel, done, &manager)
 	go startBluetooth(dataChannel, done)
 
 	fmt.Printf("Starting server on port %d\n", *port)
@@ -75,7 +72,7 @@ func main() {
 	done <- true
 }
 
-func handleData(dataChannel chan []byte, done chan bool, list *clientList) {
+func handleData(dataChannel chan []byte, done chan bool, manager *clientManager) {
 	rcvPart1 := false
 	var part1Analog int
 	binaryValue := false
@@ -95,12 +92,7 @@ func handleData(dataChannel chan []byte, done chan bool, list *clientList) {
 						rcvPart1 = false
 						analogValue := int(b) | part1Analog
 
-						msg := clientMessage{binaryValue, analogValue}
-						list.Lock()
-						for _, c := range list.clients {
-							c <- msg
-						}
-						list.Unlock()
+						manager.broadcast <- clientMessage{binaryValue, analogValue}
 					}
 				}
 			}
@@ -113,7 +105,31 @@ type clientMessage struct {
 	Analog int
 }
 
-type clientList struct {
-	clients []chan clientMessage
-	sync.Mutex
+type client struct {
+	send chan clientMessage
+}
+
+type clientManager struct {
+	clients    map[*client]bool
+	broadcast  chan clientMessage
+	register   chan *client
+	unregister chan *client
+}
+
+func (m *clientManager) run() {
+	for {
+		select {
+		case c := <-m.register:
+			m.clients[c] = true
+		case c := <-m.unregister:
+			if _, ok := m.clients[c]; ok {
+				delete(m.clients, c)
+				close(c.send)
+			}
+		case message := <-m.broadcast:
+			for c := range m.clients {
+				c.send <- message
+			}
+		}
+	}
 }

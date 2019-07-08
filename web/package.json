@@ -24,6 +24,7 @@
     "typescript": "^3.5.2"
   },
   "dependencies": {
-    "bulma": "^0.7.5"
+    "bulma": "^0.7.5",
+    "reconnecting-websocket": "^4.1.10"
   }
 }
